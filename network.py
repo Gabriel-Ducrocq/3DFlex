@@ -46,13 +46,14 @@ def inloop_all_W(all_u_and_variance_and_density, dictionnary):
     :param dictionnary:
     :return:
     """
-    kernel_variance = all_u_and_variance_and_density["kernel_variance"]
-    all_voxels_centroids = dictionnary["all_voxels_centroids"]
-    all_u = all_u_and_variance_and_density["all_u"]
+    #kernel_variance = all_u_and_variance_and_density["kernel_variance"]
+    #all_voxels_centroids = dictionnary["all_voxels_centroids"]
+    #all_u = all_u_and_variance_and_density["all_u"]
     base_density = all_u_and_variance_and_density["base_density"]
-    return all_u_and_variance_and_density, jnp.sum(jnp.multiply(jnp.exp(
-        jnp.divide(jnp.multiply(-1, jnp.sum(jnp.square(jnp.subtract(all_voxels_centroids, all_u)), axis=1))
-                   , 2 * kernel_variance)), base_density))
+    return all_u_and_variance_and_density, jnp.multiply(base_density, base_density)
+    #return all_u_and_variance_and_density, jnp.sum(jnp.multiply(jnp.exp(
+    #    jnp.divide(jnp.multiply(-1, jnp.sum(jnp.square(jnp.subtract(all_voxels_centroids, all_u)), axis=1))
+    #               , 2 * kernel_variance)), base_density))
 
 inloop_all_W_jit = jax.jit(inloop_all_W)
 
@@ -105,8 +106,9 @@ class Compute_all_W(hk.Module):
     def __call__(self, x):
         base_density, all_u = x["base_density"], x["all_u"]
         xs = {"all_voxels_centroids":self.all_voxels_centroids}
-        all_u_and_variance_and_density = {"all_u":all_u, "kernel_variance":self.kernel_variance, "base_density":base_density}
-        _, all_W = jax.lax.scan(inloop_all_W_jit, all_u_and_variance_and_density, xs)
+        x.update({"all_u":all_u, "kernel_variance":self.kernel_variance})
+        print("Launching jax loop")
+        _, all_W = jax.lax.scan(inloop_all_W_jit, x, xs)
         return all_W
 
 
@@ -179,11 +181,12 @@ params = compute_all_u.init(key, all_coeffs)
 
 
 
+test =compute_all_u.apply(all_coeffs=compute_all_A_and_B_matrices.apply(
+                          convection_vectors=convection_vector, params=params), params=params)
 
-
+print("Done computing test")
 test = compute_all_W.apply(x={"base_density":base_density,
-                      "all_u":compute_all_u.apply(all_coeffs=compute_all_A_and_B_matrices.apply(
-                          convection_vectors=convection_vector, params=params), params=params)}, params = params)
+                      "all_u":test}, params = params)
 print(params)
 print(test.shape)
 print(all_voxels_centroids.shape)
