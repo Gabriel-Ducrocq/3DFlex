@@ -13,8 +13,8 @@ def computing_centroid_voxels(n_voxels, voxel_sizes):
     return all_voxels_centroids
 
 
-def getting_pixels_elements(all_pixels_centroids, grid):
-    return grid.find_containing_cell(all_pixels_centroids)
+def getting_voxels_elements(all_voxels_centroids, grid):
+    return grid.find_containing_cell(all_voxels_centroids)
 
 
 def compute_inverse_matrix(vert1, vert2, vert3, vert4):
@@ -38,5 +38,8 @@ def compute_all_inverse_matrices(mesh_elements, mesh_nodes):
 
 def preprocessing_pipeline(grid, mesh_elements, mesh_nodes, n_voxels, voxel_sizes):
     all_voxels_centroids = computing_centroid_voxels(n_voxels, voxel_sizes)
+    voxels_elements = getting_voxels_elements(all_voxels_centroids, grid)
+    all_inv_matrices = compute_all_inverse_matrices(mesh_elements, mesh_nodes)
+    return all_voxels_centroids, voxels_elements, all_inv_matrices
 
 

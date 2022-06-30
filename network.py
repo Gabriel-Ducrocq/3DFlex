@@ -8,155 +8,119 @@ import pyvista as pv
 import time
 import mrcfile
 import itertools
+import preprocessor
 
 
-class Network():
-    def __init__(self, base_density, mesh_elements, mesh_nodes, voxels_sizes, n_voxels, unstructured_grid, dim_latent,
-                 kernel_variance = 1):
-        self.dim_latent = dim_latent
-        self.kernel_variance = kernel_variance
-        self.base_density= base_density
-        self.mesh_elements = mesh_elements
+
+def inloop_A_and_b(convection_vectors, dictionnary):
+    vertices_numbers = dictionnary["mesh_elements"]
+    convection_vectors_elt = convection_vectors.at[vertices_numbers].get()
+    inv_mat = dictionnary["all_inv_matrices"]
+    return convection_vectors, inv_mat @ convection_vectors_elt
+
+inloop_A_and_b_jit = jax.jit(inloop_A_and_b)
+
+
+
+
+def inloop_all_u(all_coeffs, dictionnary):
+    """
+
+    :param all_coeffs: array (n_elements, 4, 3), array of interpolation coefficients to compute the displacement u, v, w for each element
+    :param dictionnary:
+    :return: all_coeffs, displacement vector (u,v,w) expressed at the voxel centroid
+    """
+    voxels_elements = dictionnary["voxels_elements"]
+    all_voxels_centroids = dictionnary["all_voxels_centroids"]
+    return all_coeffs, jnp.dot(jnp.concatenate([jnp.ones(1), all_voxels_centroids]), all_coeffs[voxels_elements])
+
+inloop_all_u_jit = jax.jit(inloop_all_u)
+
+
+
+
+def inloop_all_W(all_u_and_variance_and_density, dictionnary):
+    """
+    Compute, for each voxel x, the quantity ssum_y k(x - u(y))V(y)
+    :param all_u_and_variance:
+    :param dictionnary:
+    :return:
+    """
+    kernel_variance = all_u_and_variance_and_density["kernel_variance"]
+    all_voxels_centroids = dictionnary["all_voxels_centroids"]
+    all_u = all_u_and_variance_and_density["all_u"]
+    base_density = all_u_and_variance_and_density["base_density"]
+    return all_u_and_variance_and_density, jnp.sum(jnp.multiply(jnp.exp(
+        jnp.divide(jnp.multiply(-1, jnp.sum(jnp.square(jnp.subtract(all_voxels_centroids, all_u)), axis=1))
+                   , 2 * kernel_variance)), base_density))
+
+inloop_all_W_jit = jax.jit(inloop_all_W)
+
+
+class Compute_all_A_and_b_matrices(hk.Module):
+    def __init__(self, mesh_elements, inv_matrices, name="A_and_b"):
+        super().__init__(name=name)
+        self.mesh_elements = jnp.array(mesh_elements)
         self.n_elements = mesh_elements.shape[0]
-        self.mesh_nodes = mesh_nodes
-        self.n_nodes = mesh_nodes.shape[0]
-        self.voxel_sizes = voxels_sizes
-        self.n_voxels = n_voxels
-        self.grid = unstructured_grid
-        self.num_pixels = len(base_density)
+        self.inv_matrices = jnp.array(inv_matrices)
 
-        print("Creating centroids:")
-        #self.create_pixel_centroids(n_voxels, voxels_sizes)
-        print("Getting pixel elements")
-        #self.get_pixels_element()
-
-
-        print("Declaring")
-        self.compute_inverse_matrix_jit = jax.jit(self.compute_inverse_matrix)
-
-        #print("Computing inverse matrices")
-        #start = time.time()
-        #self.all_inv_matrices = self.compute_all_inverse_matrices()
-        #self.all_inv_matrices.block_until_ready()
-        #print(time.time()-start)
-
-        #self.encoder = hk.nets.MLP([dim_latent, 128, 128, self.n_nodes * 3], activate_final=False, name="encoder")
-
-    def create_pixel_centroids(self, n_voxels, voxel_sizes):
-        self.centroids_x = np.arange(0, n_voxels[0])*voxel_sizes[0] + voxel_sizes[0]/2
-        self.centroids_y = np.arange(0, n_voxels[1])*voxel_sizes[1] + voxel_sizes[1]/2
-        self.centroids_z = np.arange(0, n_voxels[2])*voxel_sizes[2] + voxel_sizes[2]/2
-
-    def get_pixels_element(self):
-        print("Computing centroids")
-        all_pixels_centroids = np.array(list(itertools.product(self.centroids_x, self.centroids_y, self.centroids_z)))
-        print("Getting elements")
-        pixels_element = self.grid.find_containing_cell(all_pixels_centroids)
-        print("Setting centroids to jax")
-        self.all_pixels_centroids = jnp.array(all_pixels_centroids)
-        print("Setting pixels elements to jax")
-        self.pixels_element = jnp.array(pixels_element)
-
-    def compute_inverse_matrix(self, vert1, vert2, vert3, vert4):
-        m = jnp.concatenate([jnp.ones((4,1)),jnp.array([ vert1, vert2, vert3, vert4])], axis = 1)
-        return jnp.linalg.pinv(m)
-
-    def compute_all_inverse_matrices(self):
-        all_inv_matrices = np.zeros((self.n_elements, 4, 4))
-        for i in range(self.n_elements):
-            elt1, elt2, elt3, elt4 = self.mesh_elements[i]
-            all_inv_matrices[i, :, :] = self.compute_inverse_matrix_jit(self.mesh_nodes[elt1], self.mesh_nodes[elt2],
-                                                                          self.mesh_nodes[elt3], self.mesh_nodes[elt4])
-
-        return all_inv_matrices
-
-
-    def forward_encoder(self, z):
-        convection_vectors = self.encoder(z)
-        convection_vectors = jnp.reshape(convection_vectors, (-1, 3))
-        return convection_vectors
-
-
-    def compute_all_A_and_b_matrices(self, convection_vectors):
+    def __call__(self, convection_vectors):
         """
         Computes the matrices A_j and vector B_j for every element j of the FEM.
         :param convection_vectors: array of size (n_nodes, 3) of all the convection vectors at tthe FEM vertices
         :return: array(n_elements,
         """
-        all_coeffs = jnp.zeros((self.n_elements, 4, 3))
-        all_elts = jnp.arange(0, self.n_elements)
-        for elt in all_elts:
-            vertices_numbers = self.mesh_elements[elt]
-            convection_vectors_elt = convection_vectors[vertices_numbers]
-            inv_mat = self.all_inv_matrices[elt, :, :]
-            coeffs_elt = jnp.dot(inv_mat, convection_vectors_elt)
-            all_coeffs = all_coeffs.at[elt].set(coeffs_elt)
+        mesh_elements = self.mesh_elements
+        all_inv_matrices = self.inv_matrices
+        xs = {"mesh_elements": jnp.array(mesh_elements), "all_inv_matrices": all_inv_matrices}
+        convection_vectors_again, all_A_and_b_matrices = jax.lax.scan(inloop_A_and_b_jit, convection_vectors, xs)
+        return all_A_and_b_matrices
 
-        return all_coeffs
 
-    def compute_u(self, pix, all_coeffs):
-        """
 
-        :param coordinates_centroid: coordinate of the centroid to perform u(coordinates_centroid)
-        :param elt: integer, elements to which the voxel belongs to.
-        :param all_coeffs: array (n_elements, 4, 3) coefficients of the matrices A and bias b of interpolation.
-        :return: array (1, 3), the value u(coordinates_centroid).
-        """
-        elt = self.pixels_element[pix]
-        coeffs = jnp.concatenate([jnp.ones(1), all_coeffs[elt]])
-        return jnp.dot(jnp.concatenate([jnp.ones(1),self.all_pixels_centroids[pix]]), coeffs)
+class Compute_all_u(hk.Module):
+    def __init__(self, voxels_elements, all_voxels_centroids, name="all_u"):
+        super().__init__(name=name)
+        self.voxels_elements = jnp.array(voxels_elements)
+        self.all_voxels_centroids = jnp.array(all_voxels_centroids)
+        self.num_voxels = voxels_elements.shape[0]
 
-    def compute_all_u(self, all_coeffs):
+    def __call__(self, all_coeffs):
         """
 
         :param all_coeffs: array (n_elements, 4, 3) coefficients of the matrices A and bias b of interpolation.
         :return: array (N_voxels, 3), the value u(coordinates_centroid) for each voxel.
         """
-        all_u = jnp.zeros((self.num_pixels, 3))
-        all_voxels = jnp.arange(0, self.num_pixels)
-        for vox in all_voxels:
-            u_at_vox = self.compute_u(vox, all_coeffs)
-            all_u.at[vox].set(u_at_vox)
-
+        xs = {"voxels_elements":self.voxels_elements, "all_voxels_centroids":self.all_voxels_centroids}
+        _, all_u = jax.lax.scan(inloop_all_u_jit, all_coeffs, xs)
         return all_u
 
-    def compute_W_pixel(self, voxel, all_u):
-        """
 
-        :param voxel: voxel number
-        :param all_u: array (N_voxel, 3), the new - transformed - coordinates
-        :return: interpolation with exponential kernel, at the specified voxel.
-        """
-        return jnp.exp(jnp.divide(jnp.multiply(-1, jnp.sum(jnp.square(jnp.substract(self.all_pixels_centroids[voxel] - all_u)), axis = 1))
-                                  , 2*self.kernel_variance))
+class Compute_all_W(hk.Module):
+    def __init__(self, kernel_variance, all_voxels_centroids, name="all_W"):
+        super().__init__(name=name)
+        self.kernel_variance = kernel_variance
+        self.all_voxels_centroids = all_voxels_centroids
 
-
-    def compute_W(self, all_u):
-        """
-
-        :param all_u: array (N_voxels, 3), the new - transformed - coordinates
-        :return: array (N_voxels,) the values of the convected density W at each voxel.
-        """
-        all_W = jnp.zeros((self.num_pixels, 3))
-        all_voxels = jnp.arange(0, self.num_pixels)
-        for vox in all_voxels:
-            w_at_vox = self.compute_W_pixel(vox, all_u)
-            all_W.at[vox].set(w_at_vox)
-
+    def __call__(self, x):
+        base_density, all_u = x["base_density"], x["all_u"]
+        xs = {"all_voxels_centroids":self.all_voxels_centroids}
+        all_u_and_variance_and_density = {"all_u":all_u, "kernel_variance":self.kernel_variance, "base_density":base_density}
+        _, all_W = jax.lax.scan(inloop_all_W_jit, all_u_and_variance_and_density, xs)
         return all_W
 
-    #def pipeline(self, base_density, latent variables, ):
 
 
-
-        
 
 reader = pv.STLReader("testSTL.stl")
 mesh = reader.read()
+print("Done reading")
 tet = tetgen.TetGen(mesh)
 tet.tetrahedralize(order=1, mindihedral=20, minratio=1.5)
+print("Done tetra")
 grid = tet.grid
-
+print("Done grid")
+"""
 with mrcfile.open('DrBphP.mrc') as mrc:
     map = mrc.header
 
@@ -170,4 +134,81 @@ start = time.time()
 seed = 123
 key = jax.random.PRNGKey(seed)
 base_density = jax.random.normal(key, shape=(jnp.product(jnp.array(n_voxels)),) )
-net = Network(base_density, tet.elem, tet.node, voxel_sizes, n_voxels, grid, 5)
+#net = Network(base_density, tet.elem, tet.node, voxel_sizes, n_voxels, grid, 5)
+all_voxels_centroids, voxels_element, all_inv_matrices = preprocessor.preprocessing_pipeline(grid, tet.elem, tet.node, n_voxels, voxel_sizes)
+data = {"all_voxels_centroids":all_voxels_centroids, "voxels_elements":voxels_element, "all_inv_matrices":all_inv_matrices}
+np.save("data/DrBphP/data.npy", data, allow_pickle=True)
+"""
+n_voxels = (320, 320, 320)
+seed = 123
+key = jax.random.PRNGKey(seed)
+base_density = jax.random.normal(key, shape=(jnp.product(jnp.array(n_voxels)),) )
+d = np.load("data/DrBphP/data.npy", allow_pickle=True)
+d = d.item()
+all_inv_matrices = d["all_inv_matrices"]
+voxels_elements = d["voxels_elements"]
+all_voxels_centroids = d["all_voxels_centroids"]
+
+
+
+convection_vector = jnp.ones((tet.elem.shape[0], 3))
+all_coeffs = jnp.ones((tet.elem.shape[0], 4, 3))
+
+
+def _compute_all_A_and_B_matrices(convection_vectors):
+    net = Compute_all_A_and_b_matrices(tet.elem, all_inv_matrices)
+    return net(convection_vectors)
+
+def _compute_all_u(all_coeffs):
+    net = Compute_all_u(voxels_elements, all_voxels_centroids)
+    return net(all_coeffs)
+
+def _compute_all_W(x):
+    net = Compute_all_W(1, all_voxels_centroids)
+    return net(x)
+
+
+
+compute_all_A_and_B_matrices = hk.without_apply_rng(hk.transform(_compute_all_A_and_B_matrices))
+compute_all_u =hk.without_apply_rng(hk.transform(_compute_all_u))
+compute_all_W =hk.without_apply_rng(hk.transform(_compute_all_W))
+
+
+params = compute_all_A_and_B_matrices.init(key, convection_vector)
+params = compute_all_u.init(key, all_coeffs)
+
+
+
+
+
+test = compute_all_W.apply(x={"base_density":base_density,
+                      "all_u":compute_all_u.apply(all_coeffs=compute_all_A_and_B_matrices.apply(
+                          convection_vectors=convection_vector, params=params), params=params)}, params = params)
+print(params)
+print(test.shape)
+print(all_voxels_centroids.shape)
+
+
+#def _compute_all_u(all_coeffs):
+#    return net.compute_all_u(all_coeffs)
+
+#compute_all_u = hk.without_apply_rng(hk.transform(_compute_all_u))
+
+#def _compute_all_W(all_u):
+#    return net.compute_all_W(all_u)
+
+#compute_all_W = hk.without_apply_rng(hk.transform(_compute_all_W))
+
+"""
+print("Generating convection vector")
+#convection_vector = jax.random.normal(key, shape = (tet.elem.shape[0], 3))
+convection_vector = jnp.ones((tet.elem.shape[0], 3))
+print("Initializing params:")
+jax_init = jax.jit(compute_all_A_and_B_matrices.init)
+params = jax_init(key, convection_vector)
+print("params:")
+print(params)
+all_A_b_matrices = compute_all_A_and_B_matrices.apply(x=convection_vector)
+print(all_A_b_matrices.shape)
+"""
+
