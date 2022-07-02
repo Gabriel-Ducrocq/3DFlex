@@ -3,6 +3,7 @@
   <component name="ChangeListManager">
     <list default="true" id="40a7def8-7052-42f7-bde2-555a545c9ca0" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/network.py" beforeDir="false" afterPath="$PROJECT_DIR$/network.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/test.py" beforeDir="false" afterPath="$PROJECT_DIR$/test.py" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -24,11 +25,11 @@
           </provider>
         </entry>
       </file>
-      <file pinned="false" current-in-tab="true">
+      <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/network.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="463">
-              <caret line="51" column="4" selection-start-line="51" selection-start-column="4" selection-end-line="51" selection-end-column="4" />
+            <state relative-caret-position="171">
+              <caret line="173" column="12" lean-forward="true" selection-start-line="173" selection-start-column="12" selection-end-line="173" selection-end-column="12" />
               <folding>
                 <element signature="e#0#18#0" expanded="true" />
               </folding>
@@ -48,11 +49,11 @@
           </provider>
         </entry>
       </file>
-      <file pinned="false" current-in-tab="false">
+      <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/test.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="240">
-              <caret line="16" column="10" lean-forward="true" selection-start-line="16" selection-start-column="10" selection-end-line="16" selection-end-column="10" />
+            <state relative-caret-position="483">
+              <caret line="39" column="3" lean-forward="true" selection-start-line="39" selection-start-column="3" selection-end-line="39" selection-end-column="3" />
               <folding>
                 <element signature="e#0#18#0" expanded="true" />
               </folding>
@@ -75,6 +76,13 @@
       <find>point</find>
       <find>itert</find>
       <find>all_inv_matrices</find>
+      <find>.at</find>
+      <find>.set</find>
+      <find>kernel_variance</find>
+      <find>base_density</find>
+      <find>jnp.zeros</find>
+      <find>laun</find>
+      <find>key</find>
     </findStrings>
   </component>
   <component name="Git.Settings">
@@ -85,16 +93,15 @@
       <list>
         <option value="$PROJECT_DIR$/decoder.py" />
         <option value="$PROJECT_DIR$/preprocessor.py" />
-        <option value="$PROJECT_DIR$/test.py" />
         <option value="$PROJECT_DIR$/network.py" />
+        <option value="$PROJECT_DIR$/test.py" />
       </list>
     </option>
   </component>
-  <component name="ProjectFrameBounds" fullScreen="true">
-    <option name="x" value="-143" />
-    <option name="y" value="-1200" />
+  <component name="ProjectFrameBounds">
+    <option name="y" value="25" />
     <option name="width" value="1920" />
-    <option name="height" value="1200" />
+    <option name="height" value="823" />
   </component>
   <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
   <component name="ProjectView">
@@ -132,7 +139,7 @@
       </list>
     </option>
   </component>
-  <component name="RunManager" selected="Python.network">
+  <component name="RunManager" selected="Python.test">
     <configuration name="decoder" type="PythonConfigurationType" factoryName="Python" temporary="true">
       <module name="3DFlex" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -198,8 +205,8 @@
     </configuration>
     <recent_temporary>
       <list>
-        <item itemvalue="Python.network" />
         <item itemvalue="Python.test" />
+        <item itemvalue="Python.network" />
         <item itemvalue="Python.decoder" />
       </list>
     </recent_temporary>
@@ -218,7 +225,7 @@
     <servers />
   </component>
   <component name="ToolWindowManager">
-    <frame x="-143" y="-1200" width="1920" height="1200" extended-state="0" />
+    <frame x="0" y="25" width="1920" height="823" extended-state="0" />
     <editor active="true" />
     <layout>
       <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.1864139" />
@@ -226,7 +233,7 @@
       <window_info id="Favorites" order="2" side_tool="true" />
       <window_info anchor="bottom" id="Message" order="0" />
       <window_info anchor="bottom" id="Find" order="1" />
-      <window_info active="true" anchor="bottom" id="Run" order="2" visible="true" weight="0.2" />
+      <window_info anchor="bottom" id="Run" order="2" weight="0.31172413" />
       <window_info anchor="bottom" id="Debug" order="3" weight="0.4" />
       <window_info anchor="bottom" id="Cvs" order="4" weight="0.25" />
       <window_info anchor="bottom" id="Inspection" order="5" weight="0.4" />
@@ -241,13 +248,6 @@
     </layout>
   </component>
   <component name="editorHistoryManager">
-    <entry file="file:///opt/anaconda3/envs/3DFlex/lib/python3.9/site-packages/jax/_src/numpy/lax_numpy.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="148">
-          <caret line="1655" selection-start-line="1655" selection-end-line="1655" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/decoder.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="120">
@@ -258,13 +258,17 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/test.py">
+    <entry file="file:///opt/anaconda3/envs/3DFlex/lib/python3.9/site-packages/jax/_src/lax/lax.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="240">
-          <caret line="16" column="10" lean-forward="true" selection-start-line="16" selection-start-column="10" selection-end-line="16" selection-end-column="10" />
-          <folding>
-            <element signature="e#0#18#0" expanded="true" />
-          </folding>
+        <state relative-caret-position="15">
+          <caret line="119" selection-start-line="119" selection-end-line="119" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file:///opt/anaconda3/envs/3DFlex/lib/python3.9/site-packages/jax/_src/numpy/lax_numpy.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="148">
+          <caret line="3837" selection-start-line="3837" selection-end-line="3837" />
         </state>
       </provider>
     </entry>
@@ -280,8 +284,18 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/network.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="463">
-          <caret line="51" column="4" selection-start-line="51" selection-start-column="4" selection-end-line="51" selection-end-column="4" />
+        <state relative-caret-position="171">
+          <caret line="173" column="12" lean-forward="true" selection-start-line="173" selection-start-column="12" selection-end-line="173" selection-end-column="12" />
+          <folding>
+            <element signature="e#0#18#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/test.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="483">
+          <caret line="39" column="3" lean-forward="true" selection-start-line="39" selection-start-column="3" selection-end-line="39" selection-end-column="3" />
           <folding>
             <element signature="e#0#18#0" expanded="true" />
           </folding>

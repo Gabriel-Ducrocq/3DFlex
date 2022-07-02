@@ -38,22 +38,44 @@ inloop_all_u_jit = jax.jit(inloop_all_u)
 
 
 
-
+"""
 def inloop_all_W(all_u_and_variance_and_density, dictionnary):
-    """
-    Compute, for each voxel x, the quantity ssum_y k(x - u(y))V(y)
-    :param all_u_and_variance:
-    :param dictionnary:
-    :return:
-    """
-    #kernel_variance = all_u_and_variance_and_density["kernel_variance"]
-    #all_voxels_centroids = dictionnary["all_voxels_centroids"]
-    #all_u = all_u_and_variance_and_density["all_u"]
+
+    #We have no choice but looping over n_voxels**2, since a loop in a loop ttakes too much time to compile...
+    #Compute, for each voxel x, the quantity sum_y k(x - u(y))V(y)
+    #:param all_u_and_variance:
+    #:param dictionnary:
+    #:return:
+
+    n_voxels = all_u_and_variance_and_density["n_voxels"]
     base_density = all_u_and_variance_and_density["base_density"]
-    return all_u_and_variance_and_density, jnp.multiply(base_density, base_density)
-    #return all_u_and_variance_and_density, jnp.sum(jnp.multiply(jnp.exp(
-    #    jnp.divide(jnp.multiply(-1, jnp.sum(jnp.square(jnp.subtract(all_voxels_centroids, all_u)), axis=1))
-    #               , 2 * kernel_variance)), base_density))
+    kernel_variance = all_u_and_variance_and_density["kernel_variance"]
+
+    n = all_u_and_variance_and_density["n"]
+    all_u_and_variance_and_density["n"] = n + 2
+    vox_centroid = all_voxels_centroids.at[jnp.int32(n//n_voxels)].get()
+    u = all_u.at[jnp.int32(n%n_voxels)].get()
+    norm = jnp.sum(jnp.square(jnp.subtract(vox_centroid, u)))
+    ker = jnp.exp(jnp.multiply(norm, -1/(2*kernel_variance)))
+    #smoothed_term = ker*base_density.at[jnp.int32(n % n_voxels)].get()
+    smoothed_term = base_density.at[jnp.int32(n % n_voxels)].get()
+    #all_u_and_variance_and_density["W"].at[jnp.int32(n//n_voxels)].add(smoothed_term.at[0].get())
+    all_u_and_variance_and_density["W"].at[jnp.int32(n//n_voxels)].set(1.0)
+    return all_u_and_variance_and_density, None
+"""
+def inloop_all_W(all_u_and_variance_and_density, voxel_centroid):
+
+    #We have no choice but looping over n_voxels**2, since a loop in a loop ttakes too much time to compile...
+    #Compute, for each voxel x, the quantity sum_y k(x - u(y))V(y)
+    #:param all_u_and_variance:
+    #:param dictionnary:
+    #:return:
+
+    all_u = all_u_and_variance_and_density["all_u"]
+    base_density = all_u_and_variance_and_density["base_density"]
+    #res = jnp.sum(jnp.multiply(jnp.dot(all_u, voxel_centroid), base_density))
+    res = jnp.sum(jnp.multiply(all_u, voxel_centroid))
+    return all_u_and_variance_and_density, res
 
 inloop_all_W_jit = jax.jit(inloop_all_W)
 
@@ -100,16 +122,19 @@ class Compute_all_u(hk.Module):
 class Compute_all_W(hk.Module):
     def __init__(self, kernel_variance, all_voxels_centroids, name="all_W"):
         super().__init__(name=name)
-        self.kernel_variance = kernel_variance
-        self.all_voxels_centroids = all_voxels_centroids
+        self.kernel_variance = jnp.float32(kernel_variance)
+        self.all_voxels_centroids = jnp.array(all_voxels_centroids)
+        self.n_voxels = all_voxels_centroids.shape[0]
 
     def __call__(self, x):
         base_density, all_u = x["base_density"], x["all_u"]
-        xs = {"all_voxels_centroids":self.all_voxels_centroids}
         x.update({"all_u":all_u, "kernel_variance":self.kernel_variance})
-        print("Launching jax loop")
-        _, all_W = jax.lax.scan(inloop_all_W_jit, x, xs)
-        return all_W
+        _, res = jax.lax.scan(inloop_all_W_jit, x, all_voxels_centroids)
+        #all_u_transp = jnp.transpose(all_u)
+        #print(all_voxels_centroids.shape)
+        #print(all_u_transp.shape)
+        #res = jnp.dot(all_voxels_centroids.at[0].get(), jnp.transpose(all_u))
+        return res
 
 
 
@@ -144,17 +169,18 @@ np.save("data/DrBphP/data.npy", data, allow_pickle=True)
 n_voxels = (320, 320, 320)
 seed = 123
 key = jax.random.PRNGKey(seed)
-base_density = jax.random.normal(key, shape=(jnp.product(jnp.array(n_voxels)),) )
+base_density = jax.random.normal(key, shape=(jnp.product(jnp.array(n_voxels)), 1) )
 d = np.load("data/DrBphP/data.npy", allow_pickle=True)
 d = d.item()
 all_inv_matrices = d["all_inv_matrices"]
 voxels_elements = d["voxels_elements"]
-all_voxels_centroids = d["all_voxels_centroids"]
+all_voxels_centroids = jnp.array(d["all_voxels_centroids"])
 
 
 
 convection_vector = jnp.ones((tet.elem.shape[0], 3))
 all_coeffs = jnp.ones((tet.elem.shape[0], 4, 3))
+all_u = jnp.ones((320*320*320, 3))
 
 
 def _compute_all_A_and_B_matrices(convection_vectors):
@@ -166,7 +192,7 @@ def _compute_all_u(all_coeffs):
     return net(all_coeffs)
 
 def _compute_all_W(x):
-    net = Compute_all_W(1, all_voxels_centroids)
+    net = Compute_all_W(10000.0, all_voxels_centroids)
     return net(x)
 
 
@@ -178,18 +204,25 @@ compute_all_W =hk.without_apply_rng(hk.transform(_compute_all_W))
 
 params = compute_all_A_and_B_matrices.init(key, convection_vector)
 params = compute_all_u.init(key, all_coeffs)
+print("Initializing W")
+compute_all_W_init_jit = jax.jit(compute_all_W.init)
+compute_all_W_apply_jit = jax.jit(compute_all_W.apply)
+params =compute_all_W_init_jit(key, {"all_u":all_u, "base_density":base_density})
+print("Done initializing")
 
 
 
 test =compute_all_u.apply(all_coeffs=compute_all_A_and_B_matrices.apply(
                           convection_vectors=convection_vector, params=params), params=params)
 
-print("Done computing test")
-test = compute_all_W.apply(x={"base_density":base_density,
-                      "all_u":test}, params = params)
-print(params)
-print(test.shape)
-print(all_voxels_centroids.shape)
+
+print(test)
+new_input = {"all_u":test, "base_density":base_density}
+print("Lauching heavy")
+res = compute_all_W_apply_jit(x=new_input, params=params)
+
+print(res)
+
 
 
 #def _compute_all_u(all_coeffs):
