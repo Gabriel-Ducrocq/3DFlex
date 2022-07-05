@@ -4,8 +4,10 @@ from jax import jit
 import jax.numpy as jnp
 import numpy as np
 import tetgen
+import jax.scipy as jscp
 import pyvista as pv
 import time
+import scipy
 import mrcfile
 import itertools
 import preprocessor
@@ -63,18 +65,17 @@ def inloop_all_W(all_u_and_variance_and_density, dictionnary):
     all_u_and_variance_and_density["W"].at[jnp.int32(n//n_voxels)].set(1.0)
     return all_u_and_variance_and_density, None
 """
-def inloop_all_W(all_u_and_variance_and_density, voxel_centroid):
-
-    #We have no choice but looping over n_voxels**2, since a loop in a loop ttakes too much time to compile...
-    #Compute, for each voxel x, the quantity sum_y k(x - u(y))V(y)
-    #:param all_u_and_variance:
-    #:param dictionnary:
-    #:return:
-
+def inloop_all_W(all_u_and_variance_and_density, voxels_centroids_and_indexes):
+    voxel_centroid = voxels_centroids_and_indexes["all_voxels_centroids"]
+    voxel_index = voxels_centroids_and_indexes["all_voxels_indexes"]
+    pix_belonging = all_u_and_variance_and_density["pix_belonging"]
     all_u = all_u_and_variance_and_density["all_u"]
-    base_density = all_u_and_variance_and_density["base_density"]
-    #res = jnp.sum(jnp.multiply(jnp.dot(all_u, voxel_centroid), base_density))
-    res = jnp.sum(jnp.multiply(all_u, voxel_centroid))
+    t = all_u[pix_belonging.at[0].get()]
+    #t = jnp.where(pix_belonging.at[0].get() == voxel_index.at[0].get() and pix_belonging.at[1].get() == voxel_index.at[0].get()
+    #              and pix_belonging.at[2].get()  == voxel_index.at[0].get(), all_u)
+
+    res = jnp.sum(t)
+    #res = 1
     return all_u_and_variance_and_density, res
 
 inloop_all_W_jit = jax.jit(inloop_all_W)
@@ -125,11 +126,17 @@ class Compute_all_W(hk.Module):
         self.kernel_variance = jnp.float32(kernel_variance)
         self.all_voxels_centroids = jnp.array(all_voxels_centroids)
         self.n_voxels = all_voxels_centroids.shape[0]
+        self.voxel_size = 0.82
+        self.voxels_indexes = jnp.array(np.int32(np.random.uniform(0, 320, size=(320**3, 3))))
 
     def __call__(self, x):
         base_density, all_u = x["base_density"], x["all_u"]
-        x.update({"all_u":all_u, "kernel_variance":self.kernel_variance})
-        _, res = jax.lax.scan(inloop_all_W_jit, x, all_voxels_centroids)
+        pix_belonging = jnp.array(jnp.int32(jnp.divide(all_u, self.voxel_size)))
+        x.update({"all_u":all_u, "kernel_variance":self.kernel_variance, "pix_belonging":pix_belonging,
+                  "voxels_indexes":self.voxels_indexes})
+        all_voxels_centroids_and_indexes = {"all_voxels_centroids":self.all_voxels_centroids,
+                                            "all_voxels_indexes":pix_belonging}
+        _, res = jax.lax.scan(inloop_all_W_jit, x, all_voxels_centroids_and_indexes)
         #all_u_transp = jnp.transpose(all_u)
         #print(all_voxels_centroids.shape)
         #print(all_u_transp.shape)
@@ -166,7 +173,10 @@ all_voxels_centroids, voxels_element, all_inv_matrices = preprocessor.preprocess
 data = {"all_voxels_centroids":all_voxels_centroids, "voxels_elements":voxels_element, "all_inv_matrices":all_inv_matrices}
 np.save("data/DrBphP/data.npy", data, allow_pickle=True)
 """
+
 n_voxels = (320, 320, 320)
+box_size_x = box_size_y = box_size_z = 262.4
+voxel_sizes = (box_size_x/n_voxels[0], box_size_y/n_voxels[1], box_size_z/n_voxels[2])
 seed = 123
 key = jax.random.PRNGKey(seed)
 base_density = jax.random.normal(key, shape=(jnp.product(jnp.array(n_voxels)), 1) )
@@ -178,7 +188,7 @@ all_voxels_centroids = jnp.array(d["all_voxels_centroids"])
 
 
 
-convection_vector = jnp.ones((tet.elem.shape[0], 3))
+convection_vector = jax.random.normal(key, shape=(tet.elem.shape[0], 3))
 all_coeffs = jnp.ones((tet.elem.shape[0], 4, 3))
 all_u = jnp.ones((320*320*320, 3))
 
@@ -201,7 +211,6 @@ compute_all_A_and_B_matrices = hk.without_apply_rng(hk.transform(_compute_all_A_
 compute_all_u =hk.without_apply_rng(hk.transform(_compute_all_u))
 compute_all_W =hk.without_apply_rng(hk.transform(_compute_all_W))
 
-
 params = compute_all_A_and_B_matrices.init(key, convection_vector)
 params = compute_all_u.init(key, all_coeffs)
 print("Initializing W")
@@ -216,12 +225,36 @@ test =compute_all_u.apply(all_coeffs=compute_all_A_and_B_matrices.apply(
                           convection_vectors=convection_vector, params=params), params=params)
 
 
-print(test)
-new_input = {"all_u":test, "base_density":base_density}
-print("Lauching heavy")
-res = compute_all_W_apply_jit(x=new_input, params=params)
+print("Launching heavy")
+start = time.time()
+res = compute_all_W_apply_jit(x={"all_u":test, "base_density":base_density}, params=params)
+print("Duration:", time.time()-start)
 
-print(res)
+print(test.shape)
+
+print("Finding voxels")
+tt = jnp.divide(test, voxel_sizes[0])
+print(tt.shape)
+print(jnp.max(tt))
+print(jnp.min(tt))
+v = np.int32(tt)
+print(v[(v[:, 0] == 0 & v[:, 1] == 0)])
+
+
+
+#new_input = {"all_u":test, "base_density":base_density}
+#print("Lauching heavy")
+#res = compute_all_W_apply_jit(x=new_input, params=params)
+
+#print(res)
+#base_density = base_density.reshape((320,320, 320))
+#print(base_density.shape)
+#start = time.time()
+#test_interpol = jscp.ndimage.map_coordinates(base_density, test[:,:].T, order=1)
+#print(test_interpol.shape)
+#test_interpol = scipy.ndimage.map_coordinates(base_density, test[:,:].T, order=3)
+#end = time.time()
+#print(end-start)
 
 
 
