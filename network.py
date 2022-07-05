@@ -70,7 +70,7 @@ def inloop_all_W(all_u_and_variance_and_density, voxels_centroids_and_indexes):
     voxel_index = voxels_centroids_and_indexes["all_voxels_indexes"]
     pix_belonging = all_u_and_variance_and_density["pix_belonging"]
     all_u = all_u_and_variance_and_density["all_u"]
-    t = all_u[pix_belonging.at[0].get()]
+    t = all_u[pix_belonging.at[0].get():pix_belonging.at[0].get()+10.0]
     #t = jnp.where(pix_belonging.at[0].get() == voxel_index.at[0].get() and pix_belonging.at[1].get() == voxel_index.at[0].get()
     #              and pix_belonging.at[2].get()  == voxel_index.at[0].get(), all_u)
 
@@ -223,6 +223,8 @@ print("Done initializing")
 
 test =compute_all_u.apply(all_coeffs=compute_all_A_and_B_matrices.apply(
                           convection_vectors=convection_vector, params=params), params=params)
+
+
 
 
 print("Launching heavy")
