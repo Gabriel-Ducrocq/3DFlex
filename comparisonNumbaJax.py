@@ -38,7 +38,8 @@ def func(i, tup):
 func_jit = jax.jit(func)
 
 start = time.time()
-res, _, _ = jax.lax.fori_loop(0, 320**3, func_jit, (0, x, y))
+#res, _, _ = jax.lax.fori_loop(0, 320**3, func_jit, (0, x, y))
+res = jnp.dot(x, y[0, :])
 end = time.time()
 print(end-start)
 print(res.shape)
