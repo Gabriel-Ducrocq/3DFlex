@@ -33,8 +33,8 @@ def func(i, tup):
 
 
 
-res = jax.vmap(lambda y1: rbf(x, y))(x[0, :])
-print(res.shape)
+#res = jax.vmap(lambda y1: rbf(x, y))(x[0, :])
+#print(res.shape)
 func_jit = jax.jit(func)
 
 start = time.time()
@@ -43,11 +43,11 @@ end = time.time()
 print(end-start)
 print(res.shape)
 
-start = time.time()
-res, _, _ = jax.lax.fori_loop(0, 320**3, func_jit, (0, x, y))
-end = time.time()
-print(end-start)
-print(res.shape)
+#start = time.time()
+#res, _, _ = jax.lax.fori_loop(0, 320**3, func_jit, (0, x, y))
+#end = time.time()
+#print(end-start)
+#print(res.shape)
 
 #print("Starting nestesd map")
 #start = time.time()
