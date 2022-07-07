@@ -65,21 +65,77 @@ def inloop_all_W(all_u_and_variance_and_density, dictionnary):
     all_u_and_variance_and_density["W"].at[jnp.int32(n//n_voxels)].set(1.0)
     return all_u_and_variance_and_density, None
 """
+"""
 def inloop_all_W(all_u_and_variance_and_density, voxels_centroids_and_indexes):
-    voxel_centroid = voxels_centroids_and_indexes["all_voxels_centroids"]
-    voxel_index = voxels_centroids_and_indexes["all_voxels_indexes"]
-    pix_belonging = all_u_and_variance_and_density["pix_belonging"]
-    all_u = all_u_and_variance_and_density["all_u"]
-    t = all_u[pix_belonging.at[0].get():pix_belonging.at[0].get()+10.0]
+    #voxel_centroid = voxels_centroids_and_indexes["all_voxels_centroids"]
+    #voxel_index = voxels_centroids_and_indexes["all_voxels_indexes"]
+    #pix_belonging = all_u_and_variance_and_density["pix_belonging"]
+    #all_u = all_u_and_variance_and_density["all_u"]
+    all_u, pix_belonging = all_u_and_variance_and_density
+    #t = jax.lax.slice(all_u, pix_belonging.at[0].get():pix_belonging.at[0].get()+10)
+    t = all_u[jnp.arange(pix_belonging.at[0].get(), pix_belonging.at[0].get()+10)]
     #t = jnp.where(pix_belonging.at[0].get() == voxel_index.at[0].get() and pix_belonging.at[1].get() == voxel_index.at[0].get()
     #              and pix_belonging.at[2].get()  == voxel_index.at[0].get(), all_u)
 
     res = jnp.sum(t)
     #res = 1
-    return all_u_and_variance_and_density, res
+    return res
+    #return all_u_and_variance_and_density, res
+
+inloop_all_W_jit = jax.jit(inloop_all_W, static_argnames=["all_u_and_variance_and_density"])
+"""
+
+
+def inloop_all_W(i, tup):
+    _, all_u, pix_belonging, all_voxels_centroids, radius = tup
+    voxel_centroid = all_voxels_centroids[i]
+
+    #res = jnp.where(all_u[0] < radius + all_voxels_centroids[0] and all_u[0] > radius - all_voxels_centroids[0] and
+    #          all_u[1] < radius + all_voxels_centroids[1] and all_u[1] > radius - all_voxels_centroids[1] and
+    #          all_u[2] < radius + all_voxels_centroids[2] and all_u[2] > radius - all_voxels_centroids[2],
+    #          jnp.exp(jnp.sum((all_u - voxel_centroid)**2)), 0).sum()
+
+    #belong = pix_belonging[i-1:i+1]
+    #res = jnp.sum(belong)
+    t = jnp.multiply(all_u[:, 0], voxel_centroid[0])
+    #res1 = jnp.where(all_u[:, 0] < -660, jnp.sum(all_u - voxel_centroid, axis = 1), 0)
+    #res = jnp.sum(res1)
+    #res = jnp.where(all_u.at[:, 0].get() < 1 and all_u.at[:, 0].get()>0.7, all_u, 0).sum()
+    #d = all_u[all_u[0] < 0]
+    #t = all_u[pix_belonging[0][0], pix_belonging[0][1]]
+    res = jnp.sum(t)
+    return (res, all_u, pix_belonging, all_voxels_centroids, radius)
 
 inloop_all_W_jit = jax.jit(inloop_all_W)
 
+
+import numba as nb
+from numba import prange
+nb.jit(nopython=True, parallel=True)
+def test(all_u, voxels_centroids):
+    res = np.zeros(320**3)
+    for i in prange(320**3):
+        res[i] = np.sum(np.dot(all_u[0,:],voxels_centroids[i, 0]))
+
+    return res
+
+all_u = np.random.normal(size=(320**3, 3))
+all_voxels_centroids = np.random.normal(size=(320**3, 3))
+
+print("Launching numba func")
+start = time.time()
+res = test(all_u, all_voxels_centroids)
+end = time.time()
+print("Duration:", end - start)
+print(res)
+
+
+print("Launching numba func")
+start = time.time()
+res = test(all_u, all_voxels_centroids)
+end = time.time()
+print("Duration:", end - start)
+print(res)
 
 class Compute_all_A_and_b_matrices(hk.Module):
     def __init__(self, mesh_elements, inv_matrices, name="A_and_b"):
@@ -120,9 +176,9 @@ class Compute_all_u(hk.Module):
         return all_u
 
 
-class Compute_all_W(hk.Module):
+class Compute_all_W():
     def __init__(self, kernel_variance, all_voxels_centroids, name="all_W"):
-        super().__init__(name=name)
+        #super().__init__(name=name)
         self.kernel_variance = jnp.float32(kernel_variance)
         self.all_voxels_centroids = jnp.array(all_voxels_centroids)
         self.n_voxels = all_voxels_centroids.shape[0]
@@ -130,10 +186,12 @@ class Compute_all_W(hk.Module):
         self.voxels_indexes = jnp.array(np.int32(np.random.uniform(0, 320, size=(320**3, 3))))
 
     def __call__(self, x):
+        """
         base_density, all_u = x["base_density"], x["all_u"]
         pix_belonging = jnp.array(jnp.int32(jnp.divide(all_u, self.voxel_size)))
-        x.update({"all_u":all_u, "kernel_variance":self.kernel_variance, "pix_belonging":pix_belonging,
-                  "voxels_indexes":self.voxels_indexes})
+        #x.update({"all_u":all_u, "kernel_variance":self.kernel_variance, "pix_belonging":pix_belonging,
+        #          "voxels_indexes":self.voxels_indexes})
+        x = (pix_belonging, self.voxels_indexes)
         all_voxels_centroids_and_indexes = {"all_voxels_centroids":self.all_voxels_centroids,
                                             "all_voxels_indexes":pix_belonging}
         _, res = jax.lax.scan(inloop_all_W_jit, x, all_voxels_centroids_and_indexes)
@@ -141,6 +199,18 @@ class Compute_all_W(hk.Module):
         #print(all_voxels_centroids.shape)
         #print(all_u_transp.shape)
         #res = jnp.dot(all_voxels_centroids.at[0].get(), jnp.transpose(all_u))
+        """
+        base_density, all_u = x["base_density"], x["all_u"]
+        #pix_belonging = tuple(map(tuple, (np.int32(np.divide(all_u, self.voxel_size)))))
+        #pix_belonging = jnp.array(np.int32(np.divide(all_u, self.voxel_size)))
+        #for i in range(self.n_voxels):
+        #    res = inloop_all_W_jit(all_u, pix_belonging)
+
+        all_u = np.random.normal(size=(320**3, 3))
+        all_voxels_centroids = np.random.normal(size=(320**3, 3))
+        print("Launching loop")
+        #res = jax.lax.fori_loop(0, 320**3, inloop_all_W_jit, (0, all_u, pix_belonging, self.all_voxels_centroids, 2*0.82))
+        res = test(all_u, all_voxels_centroids)
         return res
 
 
@@ -209,14 +279,14 @@ def _compute_all_W(x):
 
 compute_all_A_and_B_matrices = hk.without_apply_rng(hk.transform(_compute_all_A_and_B_matrices))
 compute_all_u =hk.without_apply_rng(hk.transform(_compute_all_u))
-compute_all_W =hk.without_apply_rng(hk.transform(_compute_all_W))
+#compute_all_W =hk.without_apply_rng(hk.transform(_compute_all_W))
 
 params = compute_all_A_and_B_matrices.init(key, convection_vector)
 params = compute_all_u.init(key, all_coeffs)
 print("Initializing W")
-compute_all_W_init_jit = jax.jit(compute_all_W.init)
-compute_all_W_apply_jit = jax.jit(compute_all_W.apply)
-params =compute_all_W_init_jit(key, {"all_u":all_u, "base_density":base_density})
+#compute_all_W_init_jit = jax.jit(compute_all_W.init)
+#compute_all_W_apply_jit = jax.jit(compute_all_W.apply)
+#params =compute_all_W_init_jit(key, {"all_u":all_u, "base_density":base_density})
 print("Done initializing")
 
 
@@ -226,21 +296,12 @@ test =compute_all_u.apply(all_coeffs=compute_all_A_and_B_matrices.apply(
 
 
 
-
+print(test.shape)
 print("Launching heavy")
 start = time.time()
-res = compute_all_W_apply_jit(x={"all_u":test, "base_density":base_density}, params=params)
+res = _compute_all_W(x={"all_u":test, "base_density":base_density})
 print("Duration:", time.time()-start)
 
-print(test.shape)
-
-print("Finding voxels")
-tt = jnp.divide(test, voxel_sizes[0])
-print(tt.shape)
-print(jnp.max(tt))
-print(jnp.min(tt))
-v = np.int32(tt)
-print(v[(v[:, 0] == 0 & v[:, 1] == 0)])
 
 
 
