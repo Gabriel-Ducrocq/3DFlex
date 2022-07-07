@@ -294,6 +294,9 @@ def _compute_all_W(x):
     net = Compute_all_W(10000.0, all_voxels_centroids)
     return net(x)
 
+
+from jax.lib import xla_bridge
+print(xla_bridge.get_backend().platform)
 start = time.time()
 res = _compute_all_W(x={"all_u":test, "base_density":base_density})
 print("Duration:", time.time()-start)
