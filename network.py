@@ -243,7 +243,7 @@ voxel_sizes = (box_size_x/n_voxels[0], box_size_y/n_voxels[1], box_size_z/n_voxe
 seed = 123
 key = jax.random.PRNGKey(seed)
 base_density = jax.random.normal(key, shape=(jnp.product(jnp.array(n_voxels)), 1) )
-test =jax.random.normal(key, shape=(jnp.product(jnp.array(n_voxels)), 3) )
+test =jax.random.normal(key, shape=(jnp.product(jnp.array(n_voxels)), 3))
 #d = np.load("data/DrBphP/data.npy", allow_pickle=True)
 #d = d.item()
 #all_inv_matrices = d["all_inv_matrices"]
@@ -294,7 +294,7 @@ def _compute_all_W(x):
     net = Compute_all_W(10000.0, all_voxels_centroids)
     return net(x)
 
-
+start = time.time()
 res = _compute_all_W(x={"all_u":test, "base_density":base_density})
 print("Duration:", time.time()-start)
 
