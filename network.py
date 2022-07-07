@@ -124,10 +124,10 @@ all_voxels_centroids = np.random.normal(size=(320**3, 3))
 
 print("Launching numba func")
 start = time.time()
-res = test(all_u, all_voxels_centroids)
+#res = test(all_u, all_voxels_centroids)
 end = time.time()
 print("Duration:", end - start)
-print(res)
+#print(res)
 
 
 class Compute_all_A_and_b_matrices(hk.Module):
@@ -243,11 +243,12 @@ voxel_sizes = (box_size_x/n_voxels[0], box_size_y/n_voxels[1], box_size_z/n_voxe
 seed = 123
 key = jax.random.PRNGKey(seed)
 base_density = jax.random.normal(key, shape=(jnp.product(jnp.array(n_voxels)), 1) )
-d = np.load("data/DrBphP/data.npy", allow_pickle=True)
-d = d.item()
-all_inv_matrices = d["all_inv_matrices"]
-voxels_elements = d["voxels_elements"]
-all_voxels_centroids = jnp.array(d["all_voxels_centroids"])
+test =jax.random.normal(key, shape=(jnp.product(jnp.array(n_voxels)), 3) )
+#d = np.load("data/DrBphP/data.npy", allow_pickle=True)
+#d = d.item()
+#all_inv_matrices = d["all_inv_matrices"]
+#voxels_elements = d["voxels_elements"]
+#all_voxels_centroids = jnp.array(d["all_voxels_centroids"])
 
 
 """

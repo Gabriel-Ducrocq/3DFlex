@@ -27,8 +27,11 @@
       <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/network.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="-4274">
-              <caret line="5" column="1" selection-start-line="5" selection-start-column="1" selection-end-line="5" selection-end-column="1" />
+            <state relative-caret-position="324">
+              <caret line="341" lean-forward="true" selection-start-line="341" selection-end-line="341" />
+              <folding>
+                <element signature="e#0#18#0" expanded="true" />
+              </folding>
             </state>
           </provider>
         </entry>
@@ -83,6 +86,7 @@
       <find>base_density</find>
       <find>key</find>
       <find>grid</find>
+      <find>test</find>
     </findStrings>
   </component>
   <component name="Git.Settings">
@@ -300,8 +304,11 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/network.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-4274">
-          <caret line="5" column="1" selection-start-line="5" selection-start-column="1" selection-end-line="5" selection-end-column="1" />
+        <state relative-caret-position="324">
+          <caret line="341" lean-forward="true" selection-start-line="341" selection-end-line="341" />
+          <folding>
+            <element signature="e#0#18#0" expanded="true" />
+          </folding>
         </state>
       </provider>
     </entry>
