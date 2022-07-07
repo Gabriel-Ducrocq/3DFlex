@@ -3,11 +3,11 @@ import jax
 from jax import jit
 import jax.numpy as jnp
 import numpy as np
-import tetgen
+#import tetgen
 import jax.scipy as jscp
 import pyvista as pv
 import time
-import scipy
+#import scip
 import mrcfile
 import itertools
 import preprocessor
@@ -130,13 +130,6 @@ print("Duration:", end - start)
 print(res)
 
 
-print("Launching numba func")
-start = time.time()
-res = test(all_u, all_voxels_centroids)
-end = time.time()
-print("Duration:", end - start)
-print(res)
-
 class Compute_all_A_and_b_matrices(hk.Module):
     def __init__(self, mesh_elements, inv_matrices, name="A_and_b"):
         super().__init__(name=name)
@@ -201,29 +194,29 @@ class Compute_all_W():
         #res = jnp.dot(all_voxels_centroids.at[0].get(), jnp.transpose(all_u))
         """
         base_density, all_u = x["base_density"], x["all_u"]
-        #pix_belonging = tuple(map(tuple, (np.int32(np.divide(all_u, self.voxel_size)))))
+        pix_belonging = tuple(map(tuple, (np.int32(np.divide(all_u, self.voxel_size)))))
         #pix_belonging = jnp.array(np.int32(np.divide(all_u, self.voxel_size)))
         #for i in range(self.n_voxels):
         #    res = inloop_all_W_jit(all_u, pix_belonging)
 
-        all_u = np.random.normal(size=(320**3, 3))
-        all_voxels_centroids = np.random.normal(size=(320**3, 3))
+        #all_u = np.random.normal(size=(320**3, 3))
+        #all_voxels_centroids = np.random.normal(size=(320**3, 3))
         print("Launching loop")
-        #res = jax.lax.fori_loop(0, 320**3, inloop_all_W_jit, (0, all_u, pix_belonging, self.all_voxels_centroids, 2*0.82))
-        res = test(all_u, all_voxels_centroids)
+        res = jax.lax.fori_loop(0, 320**3, inloop_all_W_jit, (0, all_u, pix_belonging, self.all_voxels_centroids, 2*0.82))
+        #res = test(all_u, all_voxels_centroids)
         return res
 
 
 
 
-reader = pv.STLReader("testSTL.stl")
-mesh = reader.read()
-print("Done reading")
-tet = tetgen.TetGen(mesh)
-tet.tetrahedralize(order=1, mindihedral=20, minratio=1.5)
-print("Done tetra")
-grid = tet.grid
-print("Done grid")
+#reader = pv.STLReader("testSTL.stl")
+#mesh = reader.read()
+#print("Done reading")
+#tet = tetgen.TetGen(mesh)
+#tet.tetrahedralize(order=1, mindihedral=20, minratio=1.5)
+#print("Done tetra")
+#grid = tet.grid
+#print("Done grid")
 """
 with mrcfile.open('DrBphP.mrc') as mrc:
     map = mrc.header
@@ -257,7 +250,7 @@ voxels_elements = d["voxels_elements"]
 all_voxels_centroids = jnp.array(d["all_voxels_centroids"])
 
 
-
+"""
 convection_vector = jax.random.normal(key, shape=(tet.elem.shape[0], 3))
 all_coeffs = jnp.ones((tet.elem.shape[0], 4, 3))
 all_u = jnp.ones((320*320*320, 3))
@@ -270,11 +263,6 @@ def _compute_all_A_and_B_matrices(convection_vectors):
 def _compute_all_u(all_coeffs):
     net = Compute_all_u(voxels_elements, all_voxels_centroids)
     return net(all_coeffs)
-
-def _compute_all_W(x):
-    net = Compute_all_W(10000.0, all_voxels_centroids)
-    return net(x)
-
 
 
 compute_all_A_and_B_matrices = hk.without_apply_rng(hk.transform(_compute_all_A_and_B_matrices))
@@ -299,6 +287,13 @@ test =compute_all_u.apply(all_coeffs=compute_all_A_and_B_matrices.apply(
 print(test.shape)
 print("Launching heavy")
 start = time.time()
+"""
+
+def _compute_all_W(x):
+    net = Compute_all_W(10000.0, all_voxels_centroids)
+    return net(x)
+
+
 res = _compute_all_W(x={"all_u":test, "base_density":base_density})
 print("Duration:", time.time()-start)
 
