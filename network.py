@@ -11,7 +11,7 @@ import time
 import mrcfile
 import itertools
 import preprocessor
-
+from sklearn.metrics.pairwise import euclidean_distances
 
 
 def inloop_A_and_b(convection_vectors, dictionnary):
@@ -91,31 +91,51 @@ def inloop_all_W(i, tup):
     voxel_centroid = all_voxels_centroids[i]
 
     #res = jnp.where(all_u[0] < radius + all_voxels_centroids[0] and all_u[0] > radius - all_voxels_centroids[0] and
-    #          all_u[1] < radius + all_voxels_centroids[1] and all_u[1] > radius - all_voxels_centroids[1] and
-    #          all_u[2] < radius + all_voxels_centroids[2] and all_u[2] > radius - all_voxels_centroids[2],
+    ##          all_u[2] < radius + all_voxels_centroids[2] and all_u[2] > radius - all_voxels_centroids[2],
     #          jnp.exp(jnp.sum((all_u - voxel_centroid)**2)), 0).sum()
+
+    #res = jnp.where(all_u[0] > 10 + all_voxels_centroids[0],
+    #          jnp.exp(jnp.sum((all_u - voxel_centroid)**2)), 0).sum()
+
+    #array_bool = pix_belonging[i] == (i+1,i,i) or pix_belonging[i] == (i,i,i)
+    #array_bool = (pix_belonging[i, 0] < i + 1) & (pix_belonging[i, 0] > i - 1) & (pix_belonging[i, 1] < i + 1)  \
+    #              & (pix_belonging[i, 1] > i - 1) & (pix_belonging[i, 2] < i + 1) & (pix_belonging[i, 2] > i - 1)
+    #array_bool = pix_belonging[i] == (i, i, i)
+    #array_bool = pix_belonging[i, 0] < i+1 and pix_belonging[i, 0] > i - 1 and pix_belonging[i, 1:] == (i,i)
+    #array_bool = pix_belonging[i] < (i+1, i, i) and pix_belonging[i] > (i-1, i, i)
+    res = jnp.where((pix_belonging[i, 0] < i + 1) & (pix_belonging[i, 0] > i - 1) & (pix_belonging[i, 1] < i + 1)
+                  & (pix_belonging[i, 1] > i - 1) & (pix_belonging[i, 2] < i + 1) & (pix_belonging[i, 2] > i - 1), all_u - voxel_centroid, 0).sum()
 
     #belong = pix_belonging[i-1:i+1]
     #res = jnp.sum(belong)
-    t = jnp.multiply(all_u[:, 0], voxel_centroid[0])
+    #t = jnp.multiply(all_u[:, 0], voxel_centroid[0])
     #res1 = jnp.where(all_u[:, 0] < -660, jnp.sum(all_u - voxel_centroid, axis = 1), 0)
     #res = jnp.sum(res1)
     #res = jnp.where(all_u.at[:, 0].get() < 1 and all_u.at[:, 0].get()>0.7, all_u, 0).sum()
     #d = all_u[all_u[0] < 0]
     #t = all_u[pix_belonging[0][0], pix_belonging[0][1]]
-    res = jnp.sum(t)
+    #res = jnp.sum(t)
     return (res, all_u, pix_belonging, all_voxels_centroids, radius)
 
+
+
+def inloop_inloop(j, tup):
+    all_u, voxel_centroid = tup
+
+
 inloop_all_W_jit = jax.jit(inloop_all_W)
+
+
+
 
 
 import numba as nb
 from numba import prange
 nb.jit(nopython=True, parallel=True)
 def test(all_u, voxels_centroids):
-    res = np.zeros(320**3)
+    res = np.zeros(320)
     for i in prange(320**3):
-        res[i] = np.sum(np.dot(all_u[0,:],voxels_centroids[i, 0]))
+        res[i] = np.sum(np.dot(all_u,voxels_centroids[i, 0]))
 
     return res
 
@@ -125,9 +145,9 @@ all_voxels_centroids = np.random.normal(size=(320**3, 3))
 print("Launching numba func")
 start = time.time()
 #res = test(all_u, all_voxels_centroids)
+#res = euclidean_distances(all_voxels_centroids[0:320], all_u)
 end = time.time()
 print("Duration:", end - start)
-#print(res)
 
 
 class Compute_all_A_and_b_matrices(hk.Module):
@@ -169,6 +189,7 @@ class Compute_all_u(hk.Module):
         return all_u
 
 
+
 class Compute_all_W():
     def __init__(self, kernel_variance, all_voxels_centroids, name="all_W"):
         #super().__init__(name=name)
@@ -194,13 +215,14 @@ class Compute_all_W():
         #res = jnp.dot(all_voxels_centroids.at[0].get(), jnp.transpose(all_u))
         """
         base_density, all_u = x["base_density"], x["all_u"]
-        pix_belonging = tuple(map(tuple, (np.int32(np.divide(all_u, self.voxel_size)))))
-        #pix_belonging = jnp.array(np.int32(np.divide(all_u, self.voxel_size)))
+        #pix_belonging = tuple(map(tuple, (np.int32(np.divide(all_u, self.voxel_size)))))
+        pix_belonging = jnp.array(np.int32(np.divide(all_u, self.voxel_size)))
         #for i in range(self.n_voxels):
         #    res = inloop_all_W_jit(all_u, pix_belonging)
 
         #all_u = np.random.normal(size=(320**3, 3))
         #all_voxels_centroids = np.random.normal(size=(320**3, 3))
+        #all_u_reshaped = jnp.reshape(all_u, (320, 320, 320, 3))
         print("Launching loop")
         res = jax.lax.fori_loop(0, 320**3, inloop_all_W_jit, (0, all_u, pix_belonging, self.all_voxels_centroids, 2*0.82))
         #res = test(all_u, all_voxels_centroids)
@@ -297,6 +319,10 @@ def _compute_all_W(x):
 
 from jax.lib import xla_bridge
 print(xla_bridge.get_backend().platform)
+start = time.time()
+res = _compute_all_W(x={"all_u":test, "base_density":base_density})
+print("Duration:", time.time()-start)
+print("Again !")
 start = time.time()
 res = _compute_all_W(x={"all_u":test, "base_density":base_density})
 print("Duration:", time.time()-start)
