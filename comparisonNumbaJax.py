@@ -8,8 +8,11 @@ from numba import prange
 
 
 
-x = np.random.uniform(size=(320**3, 3))
-y = np.random.uniform(size=(320**3, 3))
+x = jnp.array(np.random.uniform(size=(320**3, 3)))
+x = jax.device_put(x)
+y = jnp.array(np.random.uniform(size=(320**3, 3)))
+y = jax.device_put(y)
+
 d = np.random.normal(size=320**3)
 
 print("Setting interpolator")
@@ -44,9 +47,9 @@ f_jit = jax.jit(f)
 func_jit = jax.jit(func)
 
 start = time.time()
-#res, _, _ = jax.lax.fori_loop(0, 320**3, func_jit, (0, x, y))
+res, _, _ = jax.lax.fori_loop(0, 320, func_jit, (0, x, y))
 #res = jnp.dot(x, y[0, :])
-res = f_jit(x,y,0)
+#res = f_jit(x,y,0)
 end = time.time()
 print(end-start)
 print(res.shape)
