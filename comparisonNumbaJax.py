@@ -74,7 +74,7 @@ end = time.time()
 print(end-start)
 
 start = time.time()
-res, _, _ = jax.lax.fori_loop(0, 320, f_jit, (0, x, y))
+res, _, _ = jax.lax.fori_loop(0, 320*320, f_jit, (0, x, y))
 #res = jnp.dot(x, y[0, :])
 end = time.time()
 print(end-start)
