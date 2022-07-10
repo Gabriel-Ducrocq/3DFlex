@@ -46,7 +46,7 @@ f_jit = jax.jit(f)
 #print(res.shape)
 func_jit = jax.jit(func)
 
-"""
+
 start = time.time()
 res, _, _ = jax.lax.fori_loop(0, 320, func_jit, (0, x, y))
 #res = jnp.dot(x, y[0, :])
@@ -56,13 +56,14 @@ print(end-start)
 print(res.shape)
 
 start = time.time()
+#res, _, _ = jax.lax.fori_loop(0, 320*320*100, func_jit, (0, x, y))
 res, _, _ = jax.lax.fori_loop(0, 320*320*100, func_jit, (0, x, y))
 #res = jnp.dot(x, y[0, :])
 #res = f_jit(x,y,0)
 end = time.time()
 print(end-start)
 print(res.shape)
-"""
+
 
 start = time.time()
 #res, _, _ = jax.lax.fori_loop(0, 320**3, func_jit, (0, x, y))
