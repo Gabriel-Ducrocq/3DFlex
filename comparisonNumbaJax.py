@@ -33,9 +33,10 @@ def func(i, tup):
     #return (jnp.sum(res), x,y)
 
 
-def f(x, y, i):
+def f(i, tup):
+    _, x, y = tup
     res = jnp.dot(x, y[i, :])
-    return res
+    return (res, x, y)
 
 f_jit = jax.jit(f)
 
@@ -68,7 +69,7 @@ print(res.shape)
 start = time.time()
 #res, _, _ = jax.lax.fori_loop(0, 320**3, func_jit, (0, x, y))
 #res = jnp.dot(x, y[0, :])
-res = f_jit(x,y,0)
+res = f_jit(0, (0, x, y))
 end = time.time()
 print(end-start)
 print(res.shape)
