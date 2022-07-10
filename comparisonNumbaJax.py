@@ -58,7 +58,7 @@ print(res.shape)
 
 start = time.time()
 #res, _, _ = jax.lax.fori_loop(0, 320*320*100, func_jit, (0, x, y))
-res, _, _ = jax.lax.fori_loop(0, 320*320, func_jit, (0, x, y))
+res, _, _ = jax.lax.fori_loop(0, 320*320*10, func_jit, (0, x, y))
 #res = jnp.dot(x, y[0, :])
 #res = f_jit(x,y,0)
 end = time.time()
