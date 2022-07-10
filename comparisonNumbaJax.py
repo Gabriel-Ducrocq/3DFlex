@@ -35,7 +35,7 @@ def func(i, tup):
 
 def f(i, tup):
     _, x, y = tup
-    res = jnp.dot(x, y[i, :])
+    res = jnp.dot(x[i, :], y)
     return (res, x, y)
 
 f_jit = jax.jit(f)
