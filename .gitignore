@@ -2,4 +2,4 @@
 *.stl
 *.npy
 *.fasta
-
+!data/monomerFasta.fasta
